@@ -1,7 +1,15 @@
 var mongoose = require("mongoose");
 
 var UserSchema = new mongoose.Schema({
-  name: {
+  id: {
+    type: String,
+    required: true,
+  },
+  first_name: {
+    type: String,
+    required: true,
+  },
+  last_name: {
     type: String,
     required: true,
   },
@@ -13,7 +21,11 @@ var UserSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-
+  type: {
+    type: Number,
+    required: true,
+    enum: [1, 2, 3],
+  },
   date: {
     type: Date,
     default: Date.now,
