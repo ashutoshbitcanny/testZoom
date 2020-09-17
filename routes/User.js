@@ -1,27 +1,24 @@
 const userController = require("../controllers/UserController");
 const passport = require("passport");
-module.exports = (router) => {
-  router.route("/users/signup").post(userController().signup);
+const router = require("express").Router();
+module.exports = () => {
+  router.post("/users/signup", userController().signup);
 
-  router
-    .route("/users/signup", passport.authenticate("jwt", { session: false }))
-    .put(userController().update);
+  router.put(
+    "/users/signup",
+    passport.authenticate("jwt", { session: false }),
+    userController().update
+  );
 
-  router.route("/users/login").post(userController().login);
+  router.post("/users/login", userController().login);
 
-  router
-    .route(
-      "/users/:userId/meetings",
-      passport.authenticate("jwt", { session: false })
-    )
-    .get(userController().getMeetings);
+  router.get(
+    "/users/:userId/meetings",
+    passport.authenticate("jwt", { session: false }),
+    userController().getMeetings
+  );
 
-  router
-    .route(
-      "/users/:userId/meetings",
-      passport.authenticate("jwt", { session: false })
-    )
-    .get(userController().createMeeting);
+  router.post("/users/:userId/meetings", userController().createMeeting);
 
   //   router.route("/users/").put(userController().UpdateUser);
 

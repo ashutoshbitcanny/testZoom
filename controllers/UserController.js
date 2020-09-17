@@ -80,6 +80,7 @@ const UserController = () => {
           const payload = {
             id: user.id,
             name: user.name,
+            _id: user._id,
           }; //create jwt payload
 
           //sign tocken
@@ -107,6 +108,12 @@ const UserController = () => {
 
   const getMeetings = async (req, res, next) => {
     console.log(req.url);
+    console.log(req.user);
+    if (req.user.id !== req.params.userId) {
+      return res.status(404).send({
+        message: "Unauthorized",
+      });
+    }
     try {
       const resData = await axios.get(`${baseUrl}${req.url}`, {
         headers: {
@@ -120,6 +127,11 @@ const UserController = () => {
   };
 
   const createMeeting = async (req, res, next) => {
+    if (req.user.id !== req.params.userId) {
+      return res.status(404).send({
+        message: "Unauthorized",
+      });
+    }
     try {
       const resData = await axios.post(`${baseUrl}${req.url}`, req.body, {
         headers: {

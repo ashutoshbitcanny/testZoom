@@ -1,21 +1,36 @@
 const meetingController = require("../controllers/MeetingController");
+const router = require("express").Router();
+const passport = require("passport");
+module.exports = () => {
+  router.get(
+    "/meetings/:meetingId",
+    passport.authenticate("jwt", { session: false }),
+    meetingController().getMeeting
+  );
 
-module.exports = (router) => {
-  router.route("/meetings/:meetingId").get(meetingController().getMeeting);
+  router.put(
+    "/meetings/:meetingId",
+    passport.authenticate("jwt", { session: false }),
+    meetingController().updateMeeting
+  );
 
-  router.route("/meetings/:meetingId").put(meetingController().updateMeeting);
+  router.delete(
+    "/meetings/:meetingId",
+    passport.authenticate("jwt", { session: false }),
+    meetingController().deleteMeeting
+  );
 
-  router
-    .route("/meetings/:meetingId")
-    .delete(meetingController().deleteMeeting);
+  router.get(
+    "/meetings/:meetingId/registrants",
+    passport.authenticate("jwt", { session: false }),
+    meetingController().getRegistrants
+  );
 
-  router
-    .route("/meetings/:meetingId/registrants")
-    .get(meetingController().getRegistrants);
-
-  router
-    .route("/meetings/:meetingId/registrants")
-    .post(meetingController().addRegistrants);
+  router.post(
+    "/meetings/:meetingId/registrants",
+    passport.authenticate("jwt", { session: false }),
+    meetingController().addRegistrants
+  );
 
   //   router.route("/users/").put(userController().UpdateUser);
 
