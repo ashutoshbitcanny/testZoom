@@ -26,7 +26,7 @@ module.exports = () => {
   //   userController().update
   // );
 
-  router.post("/users/login", userController().login);
+  router.post("/user/login", userController().login);
 
   router.get(
     "/users/:userId/meetings",

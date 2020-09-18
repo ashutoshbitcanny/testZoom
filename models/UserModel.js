@@ -81,7 +81,7 @@ var UserSchema = new mongoose.Schema(
           type: String,
         },
       },
-      required: true,
+      // required: true,
     },
     notifications: [
       {
