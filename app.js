@@ -8,6 +8,7 @@ const cors = require("cors");
 const bodyparser = require("body-parser");
 const path = require("path");
 const passport = require("passport");
+const fileUpload = require("express-fileupload");
 // const { User } = require("./routes");
 
 // require("./services/authServices").getJwks();
@@ -19,7 +20,7 @@ app.use(cors());
 app.use(bodyparser.json());
 app.use(bodyparser.urlencoded({ extended: false }));
 app.use(express.static(path.join(__dirname, "public")));
-
+app.use(fileUpload());
 //passport middleware
 app.use(passport.initialize());
 

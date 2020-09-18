@@ -1,20 +1,36 @@
-// const express = require("express");
-// const router = express.Router();
-const User = require("../models/UserModel");
-// const gravatar = require("gravatar");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const passport = require("passport");
 const axios = require("axios");
 const UserModel = require("../models/UserModel");
+const _ = require("lodash");
+const imageS3Upload = require("../utils/imageS3Upload");
 
 const UserController = () => {
   const signup = async (req, res, next) => {
     try {
-      const user = await User.findOne({ email: req.body.email });
+      const user = await UserModel.findOne({ email: req.body.email });
       if (user) {
         return res.status(400).json({ email: "email already exists" });
       }
+      let data = _.pick(req.body, [
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "country",
+        "city",
+        "state",
+        "address",
+        "pin",
+        "roles",
+        "status",
+        "about",
+        "designation",
+        "company",
+        "qualification",
+        "interests",
+        "links",
+      ]);
       const resData = await axios.post(
         `${baseUrl}/users`,
         {
@@ -33,11 +49,9 @@ const UserController = () => {
           },
         }
       );
-      const newUser = new User({
-        first_name: req.body.first_name,
-        last_name: req.body.last_name,
+      const newUser = new UserModel({
+        ...data,
         type: 1,
-        email: req.body.email,
         password: req.body.password,
         id: resData.data.id,
       });
@@ -70,7 +84,7 @@ const UserController = () => {
       const email = req.body.email;
       const password = req.body.password;
 
-      User.findOne({ email: email }).then((user) => {
+      UserModel.findOne({ email: email }).then((user) => {
         if (!user) return res.status(404).json({ email: "User not found" });
         bcrypt.compare(password, user.password).then((response) => {
           if (!response)
@@ -144,35 +158,125 @@ const UserController = () => {
     }
   };
 
-  const update = async (req, res) => {
-    try {
-      //   const resData = req.body.type;
-      const id = req.user.id;
-      const user = await User.findOneAndUpdate(
-        { id },
-        { $set: { type: req.body.type } },
-        { new: true }
-      );
-      const resData = await axios.patch(`${baseUrl}users/${id}`, {
-        type: req.body.type,
-      });
+  // const updateUser = async (req, res) => {
+  //   try {
+  //     //   const resData = req.body.type;
+  //     const id = req.user.id;
+  //     const user = await UserModel.findOneAndUpdate(
+  //       { id },
+  //       { $set: { type: req.body.type } },
+  //       { new: true }
+  //     );
+  //     const resData = await axios.patch(`${baseUrl}users/${id}`, {
+  //       type: req.body.type,
+  //     });
 
-      res.status(resData.status).send(resData.data);
+  //     res.status(resData.status).send(resData.data);
+  //   } catch (error) {
+  //     console.log(error);
+  //     if (error.response) {
+  //       res.status(error.response.status).send(error.response.data);
+  //     } else {
+  //       res.status(403).send(error.message);
+  //     }
+  //   }
+  // };
+
+  const getUsers = async (req, res) => {
+    try {
+      let users = await UserModel.find({});
+      res.status(200).send(users);
     } catch (error) {
       console.log(error);
-      if (error.response) {
-        res.status(error.response.status).send(error.response.data);
-      } else {
-        res.status(403).send(error.message);
-      }
+      res.status(406).send({
+        message: error.message,
+      });
     }
   };
+
+  const getUser = async (req, res) => {
+    const userId = req.params.userId;
+
+    try {
+      let users = await UserModel.findOne({ _id: userId });
+      res.status(200).send(users);
+    } catch (error) {
+      console.log(error);
+      res.status(406).send({
+        message: error.message,
+      });
+    }
+  };
+
+  const updateUser = async (req, res) => {
+    let user = await UserModel.findOne({ _id: req.params.userId });
+    if (!user) {
+      return res.status(400).json({ message: "User not found!" });
+    }
+    try {
+      let data = _.pick(req.body, [
+        "firstName",
+        "lastName",
+        "email",
+        "phone",
+        "country",
+        "city",
+        "state",
+        "address",
+        "pin",
+        "roles",
+        "status",
+        "about",
+        "designation",
+        "company",
+        "qualification",
+        "interests",
+        "links",
+      ]);
+
+      if (req.files) {
+        let img;
+        img = await imageS3Upload(file, fileName, store_id);
+        data.dpurl = img.Location;
+      }
+
+      user = await UserModel.findOneAndUpdate(
+        req.params.userId,
+        { $set: data },
+        { new: true }
+      );
+      res.status(200).send(user);
+    } catch (error) {
+      console.log(error);
+      res.status(406).send({
+        message: error.message,
+      });
+    }
+  };
+
+  const deleteUser = async (req, res) => {
+    const userId = req.params.userId;
+
+    try {
+      let users = await UserModel.findOneAndDelete({ _id: userId });
+      res.status(200).send(users);
+    } catch (error) {
+      console.log(error);
+      res.status(406).send({
+        message: error.message,
+      });
+    }
+  };
+
   return {
     signup,
     login,
     getMeetings,
     createMeeting,
-    update,
+    updateUser,
+    getUsers,
+    getUser,
+    deleteUser,
   };
 };
 module.exports = UserController;
