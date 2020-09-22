@@ -29,13 +29,13 @@ module.exports = () => {
   router.post("/user/login", userController().login);
 
   router.get(
-    "/users/:userId/meetings",
+    "/users/meetings",
     passport.authenticate("jwt", { session: false }),
     userController().getMeetings
   );
 
   router.post(
-    "/users/:userId/meetings",
+    "/users/meetings",
     passport.authenticate("jwt", { session: false }),
     userController().createMeeting
   );

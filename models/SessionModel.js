@@ -2,10 +2,7 @@ var mongoose = require("mongoose");
 
 var SessionModel = new mongoose.Schema(
   {
-    // id: {
-    //   type: String,
-    //   required: true,
-    // },
+    id: { type: String, required: true },
     topic: {
       type: String,
       required: true,
@@ -37,54 +34,9 @@ var SessionModel = new mongoose.Schema(
       type: String,
       enum: ["invite", "register", "open"],
     },
-    speakerList: [
-      {
-        name: {
-          type: String,
-          required: true,
-        },
-        email: {
-          type: String,
-          required: true,
-        },
-        phone: {
-          type: String,
-          required: true,
-        },
-
-        meetingLink: {
-          type: String,
-          required: true,
-        },
-        role: {
-          type: String,
-          enum: ["speaker", "moderator", "panelist"],
-        },
-      },
-    ],
     approvalNeeded: {
       type: Boolean,
     },
-    attendees: [
-      {
-        name: {
-          type: String,
-          required: true,
-        },
-        email: {
-          type: String,
-          required: true,
-        },
-        source: {
-          type: String,
-          enum: ["registered", "added"],
-        },
-
-        isApproved: {
-          type: Boolean,
-        },
-      },
-    ],
     maxCapacity: {
       type: Number,
     },
@@ -99,6 +51,7 @@ var SessionModel = new mongoose.Schema(
       type: String,
       enum: ["active", "cancelled"],
     },
+    deletedAt: { type: Date }
   },
   { timestamps: true }
 );

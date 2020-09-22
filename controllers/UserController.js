@@ -4,6 +4,10 @@ const axios = require("axios");
 const UserModel = require("../models/UserModel");
 const _ = require("lodash");
 const imageS3Upload = require("../utils/imageS3Upload");
+const platformApi = require("../helpers/zoom-api");
+const { v4: uuidv4 } = require("uuid");
+
+const SessionModel = require("../models/SessionModel");
 
 const UserController = () => {
   const signup = async (req, res, next) => {
@@ -30,10 +34,10 @@ const UserController = () => {
         "qualification",
         "interests",
         "links",
+        "platformUser"
       ]);
-      const resData = await axios.post(
-        `${baseUrl}/users`,
-        {
+      if (data.platformUser) {
+        const platResponse = await platformApi.createUser({
           action: "create",
           user_info: {
             first_name: req.body.first_name,
@@ -42,18 +46,13 @@ const UserController = () => {
             email: req.body.email,
             password: req.body.password,
           },
-        },
-        {
-          headers: {
-            authorization: `Bearer ${process.env.jwtToken}`,
-          },
-        }
-      );
+        });
+      }
       const newUser = new UserModel({
         ...data,
         type: 1,
         password: req.body.password,
-        id: resData.data.id,
+        ...(data.platformUser ? { id: "WRMgooivSyekqqM-st_Uog" } : {}) //platResponse.data.id
       });
       bcrypt.genSalt(10, function (err, salt) {
         bcrypt.hash(newUser.password, salt, function (err, hash) {
@@ -121,40 +120,70 @@ const UserController = () => {
   };
 
   const getMeetings = async (req, res, next) => {
-    console.log(req.url);
-    console.log(req.user);
-    if (req.user.id !== req.params.userId) {
-      return res.status(404).send({
-        message: "Unauthorized",
-      });
+    const platformId = req.user.id;
+    if (!platformId) {
+      return res.status(404).send("User doesn't exist in platform!");
     }
     try {
-      const resData = await axios.get(`${baseUrl}${req.url}`, {
-        headers: {
-          authorization: `Bearer ${process.env.jwtToken}`,
-        },
-      });
-      res.status(resData.status).send(resData.data);
+      const platRes = await platformApi.listMeetings(platformId);
+      const meetings = await SessionModel.find({ createdBy: req.user._id, type: "breakout" });
+      for (let elem of platRes.data.meetings) {
+        const meetingIndex = meetings.findIndex((meeting) => meeting.id == elem.id);
+        if (meetingIndex > -1) {
+          elem.id = meetings[meetingIndex]._id
+        }
+      }
+
+      res.send(platRes.data);
     } catch (error) {
-      res.status(error.response.status).send(error.response.data);
+      console.log(error);
+      if (error.response)
+        res.status(404).send(error.response.data);
+      else
+        res.status(500).send();
     }
   };
 
   const createMeeting = async (req, res, next) => {
-    if (req.user.id !== req.params.userId) {
-      return res.status(404).send({
-        message: "Unauthorized",
-      });
-    }
     try {
-      const resData = await axios.post(`${baseUrl}${req.url}`, req.body, {
-        headers: {
-          authorization: `Bearer ${process.env.jwtToken}`,
-        },
-      });
-      res.status(resData.status).send(resData.data);
+      const platformId = req.user.id;
+      if (!platformId) {
+        return res.status(404).send("User doesn't exist in platform!");
+      }
+
+      const platformData = req.body.platform;
+      const generalData = req.body.generalData;
+      const platRes = await platformApi.createMeeting(platformId, platformData);
+      const session = {
+        "id": platRes.data.id,
+        "type": "breakout",
+        "topic": platformData.topic,
+        "description": platformData.agenda,
+        "startAt": platformData.start_time,
+        "duration": platformData.duration,
+        "registrationOpen": !platformData.close_registration,
+        "platform": generalData.platform,
+        "inviteType": platformData.settings.approval_type == 0 
+          ? "invite" 
+          : platformData.settings.approval_type == 1
+          ? "register"
+          : "open",
+        "approvalNeeded": platformData.settings.approval_type == 1,
+        "maxCapacity": generalData.maxCapacity,
+        "status": "active",
+        "createdBy": req.user._id,
+      };
+
+      const sessionRes = await SessionModel.create(session);
+
+      platRes.data.id = sessionRes._id;
+      res.status(platRes.status).send(platRes.data);
     } catch (error) {
-      res.status(error.response.status).send(error.response.data);
+      console.log(error);
+      if (error.response)
+        res.status(error.response.status).send(error.response.data);
+      else
+        res.status(500).send();
     }
   };
 
