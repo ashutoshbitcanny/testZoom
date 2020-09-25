@@ -2,6 +2,7 @@ var mongoose = require("mongoose");
 
 var SessionModel = new mongoose.Schema(
   {
+    eventId: { type: mongoose.Schema.Types.ObjectId },
     id: { type: String, required: true },
     topic: {
       type: String,

@@ -6,6 +6,7 @@ const _ = require("lodash");
 const imageS3Upload = require("../utils/imageS3Upload");
 const platformApi = require("../helpers/zoom-api");
 const { v4: uuidv4 } = require("uuid");
+const ObjectId = require('mongoose').Types.ObjectId;
 
 const SessionModel = require("../models/SessionModel");
 
@@ -151,8 +152,13 @@ const UserController = () => {
         return res.status(404).send("User doesn't exist in platform!");
       }
 
-      const platformData = req.body.platform;
+      const platformData = req.body.platformData;
       const generalData = req.body.generalData;
+
+      if(!ObjectId.isValid(generalData.eventId)) {
+        return res.status(400).send({ message: "Invalid eventId" });
+      }
+
       const platRes = await platformApi.createMeeting(platformId, platformData);
       const session = {
         "id": platRes.data.id,
@@ -172,6 +178,7 @@ const UserController = () => {
         "maxCapacity": generalData.maxCapacity,
         "status": "active",
         "createdBy": req.user._id,
+        "eventId": Object(generalData.eventId)
       };
 
       const sessionRes = await SessionModel.create(session);

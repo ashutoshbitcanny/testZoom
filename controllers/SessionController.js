@@ -1,4 +1,7 @@
 const SessionModel = require("../models/SessionModel");
+const UserSessionsModel = require("../models/UserSessions");
+const ObjectId = require('mongoose').Types.ObjectId;
+
 const SessionController = () => {
   const createSession = async (req, res, next) => {
     try {
@@ -36,8 +39,32 @@ const SessionController = () => {
 
   const getSessions = async (req, res) => {
     try {
-      let sessions = await SessionModel.find({});
-      res.status(200).send(sessions);
+      const { type } = req.body;
+      const predicate = {
+        createdBy: req.user._id
+      };
+      if(type) {
+        predicate.type = type;
+      }
+      const sessions = await SessionModel.aggregate([{
+        $match: predicate
+      }, {
+        $lookup: {
+          from: 'usersessions',
+          localField: '_id',
+          foreignField: 'sessionId',
+          as: 'userSessions'
+        },
+      },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'userSessions.userId',
+          foreignField: '_id',
+          as: 'users'
+        }
+      }]);
+      res.send({ sessions });
     } catch (error) {
       console.log(error);
       res.status(406).send({
@@ -47,11 +74,35 @@ const SessionController = () => {
   };
 
   const getSession = async (req, res) => {
-    const id = req.params.id;
-
     try {
-      let sessions = await SessionModel.findOne({ _id: id });
-      res.status(200).send(sessions);
+      const id = req.params.id;
+      if (!ObjectId.isValid(id)) {
+        return res.status(400).send();
+      }
+
+      const session = await SessionModel.aggregate([
+        {
+          $match: { _id: ObjectId(id) }
+        }, {
+          $lookup: {
+            from: 'usersessions',
+            localField: '_id',
+            foreignField: 'sessionId',
+            as: 'userSessions'
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'userSessions.userId',
+            foreignField: '_id',
+            as: 'users'
+          }
+        }])
+      if(!session.length) {
+        return res.status(404).send();
+      }
+      res.send({ session: session[0] });
     } catch (error) {
       console.log(error);
       res.status(406).send({

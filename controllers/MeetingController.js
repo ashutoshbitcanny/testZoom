@@ -2,7 +2,9 @@ const axios = require("axios");
 const platformApi = require("../helpers/zoom-api");
 const SessionModel = require("../models/SessionModel");
 const UserSessionsModel = require("../models/UserSessions");
+const UserModel = require("../models/UserModel");
 const ObjectId = require('mongoose').Types.ObjectId;
+const _  = require("lodash");
 
 const MeetingController = () => {
   const getMeeting = async (req, res, next) => {
@@ -80,21 +82,32 @@ const MeetingController = () => {
         res.status(404).send();
       }
       const platformMeetingId = sessionRes.id;
-      const platformData = req.body.platform;
-      const generalData = req.body.generalData;
+      let { platformData, generalData } = req.body;
+      const role = _.toLower(generalData.role);
+      if(!role || !["speaker", "attendee"].includes(role)) {
+        return res.status(400).send({ message: "Invalid role!" });
+      }
+      let registrantId = generalData.userId;
+      if(registrantId && !ObjectId.isValid(registrantId)) {
+        return res.status(400).send({ message: "User Id is not valid" });
+      } else if(registrantId) {
+        const registrantData = await UserModel.findOne({ _id: ObjectId(registrantId) });
+        platformData = _.pick(registrantData, ["first_name", "last_name", "email"]);
+      }
       const platRes = await platformApi.addMeetingRegistrant(platformMeetingId, platformData);
-      const userSession = { 
+      const userSession = {
+        sessionId: sessionRes._id,
         type: sessionRes.type,
-        role: generalData.role
+        role
       };
-      if(generalData.role === "attendee") {
+      if(registrantId){
+        userSession.userId = ObjectId(registrantId);
+      } else {
         userSession.userData = {
           email: platformData.email, 
           first_name: platformData.first_name, 
           last_name: platformData.last_name
         }
-      } else {
-        userSession.userId = generalData.userId
       }
       await UserSessionsModel.create(userSession);
       res.status(platRes.status).send(platRes.data);
