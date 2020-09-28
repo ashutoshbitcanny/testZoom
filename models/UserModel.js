@@ -31,10 +31,6 @@ var UserSchema = new mongoose.Schema(
     state: { type: String },
     country: { type: String },
     address: { type: String },
-    roles: {
-      type: String,
-      enum: ["attendee", "speaker", "exhibitor", "organisor"],
-    },
     status: {
       type: String,
       enum: ["approved", "blocked", "notapproved"],

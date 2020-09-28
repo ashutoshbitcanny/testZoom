@@ -4,17 +4,18 @@ const SessionModel = require("../models/SessionModel");
 const UserSessionsModel = require("../models/UserSessions");
 const UserModel = require("../models/UserModel");
 const ObjectId = require('mongoose').Types.ObjectId;
-const _  = require("lodash");
+const _ = require("lodash");
+const { createOrUpdateUserEvent } = require("../helpers/userEvent");
 
 const MeetingController = () => {
   const getMeeting = async (req, res, next) => {
     try {
       const meetingId = req.params.meetingId;
-      if(!ObjectId.isValid(meetingId)) {
+      if (!ObjectId.isValid(meetingId)) {
         res.status(404).send();
       }
       const sessionRes = await SessionModel.findOne({ _id: ObjectId(meetingId), createdBy: req.user._id });
-      if(!sessionRes) {
+      if (!sessionRes) {
         res.status(404).send();
       }
       const platformMeetingId = sessionRes.id;
@@ -59,7 +60,7 @@ const MeetingController = () => {
     try {
       const meetingId = req.params.meetingId;
       const sessionRes = await SessionModel.findOne({ _id: ObjectId(meetingId), createdBy: req.user._id });
-      if(!sessionRes) {
+      if (!sessionRes) {
         res.status(404).send();
       }
       const platformMeetingId = sessionRes.id;
@@ -78,19 +79,22 @@ const MeetingController = () => {
     try {
       const meetingId = req.params.meetingId;
       const sessionRes = await SessionModel.findOne({ _id: ObjectId(meetingId), createdBy: req.user._id });
-      if(!sessionRes) {
+      if (!sessionRes) {
         res.status(404).send();
       }
       const platformMeetingId = sessionRes.id;
-      let { platformData, generalData } = req.body;
+
+      let platformData = _.pick(req.body, ["email", "first_name", "last_name"]);
+      let generalData = _.pick(req.body, ["role", "userId", "eventId"]);
+
       const role = _.toLower(generalData.role);
-      if(!role || !["speaker", "attendee"].includes(role)) {
+      if (!role || !["speaker", "attendee"].includes(role)) {
         return res.status(400).send({ message: "Invalid role!" });
       }
       let registrantId = generalData.userId;
-      if(registrantId && !ObjectId.isValid(registrantId)) {
+      if (registrantId && !ObjectId.isValid(registrantId)) {
         return res.status(400).send({ message: "User Id is not valid" });
-      } else if(registrantId) {
+      } else if (registrantId) {
         const registrantData = await UserModel.findOne({ _id: ObjectId(registrantId) });
         platformData = _.pick(registrantData, ["first_name", "last_name", "email"]);
       }
@@ -100,16 +104,18 @@ const MeetingController = () => {
         type: sessionRes.type,
         role
       };
-      if(registrantId){
+      if (registrantId) {
         userSession.userId = ObjectId(registrantId);
       } else {
         userSession.userData = {
-          email: platformData.email, 
-          first_name: platformData.first_name, 
+          email: platformData.email,
+          first_name: platformData.first_name,
           last_name: platformData.last_name
         }
-      }
+      };
       await UserSessionsModel.create(userSession);
+      if (registrantId)
+        await createOrUpdateUserEvent(ObjectId(generalData.eventId), ObjectId(registrantId), role);
       res.status(platRes.status).send(platRes.data);
     } catch (error) {
       console.log(error);

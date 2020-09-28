@@ -1,12 +1,12 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const axios = require("axios");
 const UserModel = require("../models/UserModel");
+const UserEventModel = require("../models/UserEvents");
 const _ = require("lodash");
 const imageS3Upload = require("../utils/imageS3Upload");
 const platformApi = require("../helpers/zoom-api");
-const { v4: uuidv4 } = require("uuid");
 const ObjectId = require('mongoose').Types.ObjectId;
+const { createOrUpdateUserEvent } = require("../helpers/userEvent");
 
 const SessionModel = require("../models/SessionModel");
 
@@ -17,27 +17,10 @@ const UserController = () => {
       if (user) {
         return res.status(400).json({ email: "email already exists" });
       }
-      let data = _.pick(req.body, [
-        "first_name",
-        "last_name",
-        "email",
-        "phone",
-        "country",
-        "city",
-        "state",
-        "address",
-        "pin",
-        "roles",
-        "status",
-        "about",
-        "designation",
-        "company",
-        "qualification",
-        "interests",
-        "links",
-        "platformUser"
-      ]);
-      if (data.platformUser) {
+
+      const { platformUser: isPlatformUser, eventId, role } = req.body;
+
+      if (isPlatformUser) {
         const platResponse = await platformApi.createUser({
           action: "create",
           user_info: {
@@ -49,25 +32,38 @@ const UserController = () => {
           },
         });
       }
-      const newUser = new UserModel({
-        ...data,
-        type: 1,
-        password: req.body.password,
-        ...(data.platformUser ? { id: "WRMgooivSyekqqM-st_Uog" } : {}) //platResponse.data.id
-      });
-      bcrypt.genSalt(10, function (err, salt) {
-        bcrypt.hash(newUser.password, salt, function (err, hash) {
-          // Store hash in your password DB.
-          if (err) throw err;
-          newUser.password = hash;
-          newUser
-            .save()
-            .then((user) => {
-              res.json(user);
-            })
-            .catch((err) => console.log(err));
-        });
-      });
+      const userData = _.pick(req.body, [
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "country",
+        "city",
+        "state",
+        "address",
+        "pin",
+        "status",
+        "about",
+        "designation",
+        "company",
+        "qualification",
+        "interests",
+        "links",
+        "password"
+      ]);
+      userData.type = 1;
+      if(isPlatformUser) {
+        userData.id = "WRMgooivSyekqqM-st_Uog" //platResponse.data.id
+        userData.platformUser = true;
+      };
+      const newUser = new UserModel(userData);
+
+      const salt = bcrypt.genSaltSync(10);
+      const hash = bcrypt.hashSync(newUser.password, salt);
+      newUser.password = hash;
+      await newUser.save();
+      await createOrUpdateUserEvent(ObjectId(eventId), newUser._id, role);
+      res.send({ _id: newUser._id });
     } catch (error) {
       console.log(error);
       if (error.response) {
@@ -152,10 +148,10 @@ const UserController = () => {
         return res.status(404).send("User doesn't exist in platform!");
       }
 
-      const platformData = req.body.platformData;
-      const generalData = req.body.generalData;
+      const platformData = _.pick(req.body, ["topic", "type", "start_time", "duration", "agenda", "settings"]);
+      const generalData = _.pick(req.body, ["maxCapacity", "platform", "eventId"]);
 
-      if(!ObjectId.isValid(generalData.eventId)) {
+      if (!ObjectId.isValid(generalData.eventId)) {
         return res.status(400).send({ message: "Invalid eventId" });
       }
 
@@ -169,11 +165,11 @@ const UserController = () => {
         "duration": platformData.duration,
         "registrationOpen": !platformData.close_registration,
         "platform": generalData.platform,
-        "inviteType": platformData.settings.approval_type == 0 
-          ? "invite" 
+        "inviteType": platformData.settings.approval_type == 0
+          ? "invite"
           : platformData.settings.approval_type == 1
-          ? "register"
-          : "open",
+            ? "register"
+            : "open",
         "approvalNeeded": platformData.settings.approval_type == 1,
         "maxCapacity": generalData.maxCapacity,
         "status": "active",
@@ -182,6 +178,7 @@ const UserController = () => {
       };
 
       const sessionRes = await SessionModel.create(session);
+      await createOrUpdateUserEvent(ObjectId(generalData.eventId), req.user._id, "organiser");
 
       platRes.data.id = sessionRes._id;
       res.status(platRes.status).send(platRes.data);
@@ -260,7 +257,6 @@ const UserController = () => {
         "state",
         "address",
         "pin",
-        "roles",
         "status",
         "about",
         "designation",
