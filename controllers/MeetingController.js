@@ -3,7 +3,7 @@ const platformApi = require("../helpers/zoom-api");
 const SessionModel = require("../models/SessionModel");
 const UserSessionsModel = require("../models/UserSessions");
 const UserModel = require("../models/UserModel");
-const ObjectId = require('mongoose').Types.ObjectId;
+const ObjectId = require("mongoose").Types.ObjectId;
 const _ = require("lodash");
 const { createOrUpdateUserEvent } = require("../helpers/userEvent");
 
@@ -14,7 +14,10 @@ const MeetingController = () => {
       if (!ObjectId.isValid(meetingId)) {
         res.status(404).send();
       }
-      const sessionRes = await SessionModel.findOne({ _id: ObjectId(meetingId), createdBy: req.user._id });
+      const sessionRes = await SessionModel.getOne({
+        _id: ObjectId(meetingId),
+        createdBy: req.user._id,
+      });
       if (!sessionRes) {
         res.status(404).send();
       }
@@ -25,8 +28,7 @@ const MeetingController = () => {
       console.log(error);
       if (error.response)
         res.status(error.response.status).send(error.response.data);
-      else
-        res.status(500).send();
+      else res.status(500).send();
     }
   };
 
@@ -59,26 +61,33 @@ const MeetingController = () => {
   const getRegistrants = async (req, res, next) => {
     try {
       const meetingId = req.params.meetingId;
-      const sessionRes = await SessionModel.findOne({ _id: ObjectId(meetingId), createdBy: req.user._id });
+      const sessionRes = await SessionModel.getOne({
+        _id: ObjectId(meetingId),
+        createdBy: req.user._id,
+      });
       if (!sessionRes) {
         res.status(404).send();
       }
       const platformMeetingId = sessionRes.id;
-      const platRes = await platformApi.listMeetingRegistrants(platformMeetingId);
+      const platRes = await platformApi.listMeetingRegistrants(
+        platformMeetingId
+      );
       res.status(platRes.status).send(platRes.data);
     } catch (error) {
       console.log(error);
       if (error.response)
         res.status(error.response.status).send(error.response.data);
-      else
-        res.status(500).send();
+      else res.status(500).send();
     }
   };
 
   const addRegistrants = async (req, res, next) => {
     try {
       const meetingId = req.params.meetingId;
-      const sessionRes = await SessionModel.findOne({ _id: ObjectId(meetingId), createdBy: req.user._id });
+      const sessionRes = await SessionModel.getOne({
+        _id: ObjectId(meetingId),
+        createdBy: req.user._id,
+      });
       if (!sessionRes) {
         res.status(404).send();
       }
@@ -95,14 +104,23 @@ const MeetingController = () => {
       if (registrantId && !ObjectId.isValid(registrantId)) {
         return res.status(400).send({ message: "User Id is not valid" });
       } else if (registrantId) {
-        const registrantData = await UserModel.findOne({ _id: ObjectId(registrantId) });
-        platformData = _.pick(registrantData, ["first_name", "last_name", "email"]);
+        const registrantData = await UserModel.getOne({
+          _id: ObjectId(registrantId),
+        });
+        platformData = _.pick(registrantData, [
+          "first_name",
+          "last_name",
+          "email",
+        ]);
       }
-      const platRes = await platformApi.addMeetingRegistrant(platformMeetingId, platformData);
+      const platRes = await platformApi.addMeetingRegistrant(
+        platformMeetingId,
+        platformData
+      );
       const userSession = {
         sessionId: sessionRes._id,
         type: sessionRes.type,
-        role
+        role,
       };
       if (registrantId) {
         userSession.userId = ObjectId(registrantId);
@@ -110,19 +128,22 @@ const MeetingController = () => {
         userSession.userData = {
           email: platformData.email,
           first_name: platformData.first_name,
-          last_name: platformData.last_name
-        }
-      };
-      await UserSessionsModel.create(userSession);
+          last_name: platformData.last_name,
+        };
+      }
+      await UserSessionsModel.set(userSession);
       if (registrantId)
-        await createOrUpdateUserEvent(ObjectId(generalData.eventId), ObjectId(registrantId), role);
+        await createOrUpdateUserEvent(
+          ObjectId(generalData.eventId),
+          ObjectId(registrantId),
+          role
+        );
       res.status(platRes.status).send(platRes.data);
     } catch (error) {
       console.log(error);
       if (error.response)
         res.status(error.response.status).send(error.response.data);
-      else
-        res.status(500).send();
+      else res.status(500).send();
     }
   };
 

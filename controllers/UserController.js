@@ -5,7 +5,7 @@ const UserEventModel = require("../models/UserEvents");
 const _ = require("lodash");
 const imageS3Upload = require("../utils/imageS3Upload");
 const platformApi = require("../helpers/zoom-api");
-const ObjectId = require('mongoose').Types.ObjectId;
+const ObjectId = require("mongoose").Types.ObjectId;
 const { createOrUpdateUserEvent } = require("../helpers/userEvent");
 
 const SessionModel = require("../models/SessionModel");
@@ -49,19 +49,21 @@ const UserController = () => {
         "qualification",
         "interests",
         "links",
-        "password"
+        "password",
       ]);
       userData.type = 1;
-      if(isPlatformUser) {
-        userData.id = "WRMgooivSyekqqM-st_Uog" //platResponse.data.id
+      if (isPlatformUser) {
+        userData.id = "WRMgooivSyekqqM-st_Uog"; //platResponse.data.id
         userData.platformUser = true;
-      };
-      const newUser = new UserModel(userData);
+      }
+      // const newUser = userData;
 
       const salt = bcrypt.genSaltSync(10);
       const hash = bcrypt.hashSync(newUser.password, salt);
-      newUser.password = hash;
-      await newUser.save();
+      userData.password = hash;
+      // await newUser.save();
+      // await UserModel
+      const newUser = await UserModel.set(newUser);
       await createOrUpdateUserEvent(ObjectId(eventId), newUser._id, role);
       res.send({ _id: newUser._id });
     } catch (error) {
@@ -80,7 +82,7 @@ const UserController = () => {
       const email = req.body.email;
       const password = req.body.password;
 
-      UserModel.findOne({ email: email }).then((user) => {
+      UserModel.getOne({ email: email }).then((user) => {
         if (!user) return res.status(404).json({ email: "User not found" });
         bcrypt.compare(password, user.password).then((response) => {
           if (!response)
@@ -123,21 +125,24 @@ const UserController = () => {
     }
     try {
       const platRes = await platformApi.listMeetings(platformId);
-      const meetings = await SessionModel.find({ createdBy: req.user._id, type: "breakout" });
+      const meetings = await SessionModel.getAll({
+        createdBy: req.user._id,
+        type: "breakout",
+      });
       for (let elem of platRes.data.meetings) {
-        const meetingIndex = meetings.findIndex((meeting) => meeting.id == elem.id);
+        const meetingIndex = meetings.findIndex(
+          (meeting) => meeting.id == elem.id
+        );
         if (meetingIndex > -1) {
-          elem.id = meetings[meetingIndex]._id
+          elem.id = meetings[meetingIndex]._id;
         }
       }
 
       res.send(platRes.data);
     } catch (error) {
       console.log(error);
-      if (error.response)
-        res.status(404).send(error.response.data);
-      else
-        res.status(500).send();
+      if (error.response) res.status(404).send(error.response.data);
+      else res.status(500).send();
     }
   };
 
@@ -148,8 +153,19 @@ const UserController = () => {
         return res.status(404).send("User doesn't exist in platform!");
       }
 
-      const platformData = _.pick(req.body, ["topic", "type", "start_time", "duration", "agenda", "settings"]);
-      const generalData = _.pick(req.body, ["maxCapacity", "platform", "eventId"]);
+      const platformData = _.pick(req.body, [
+        "topic",
+        "type",
+        "start_time",
+        "duration",
+        "agenda",
+        "settings",
+      ]);
+      const generalData = _.pick(req.body, [
+        "maxCapacity",
+        "platform",
+        "eventId",
+      ]);
 
       if (!ObjectId.isValid(generalData.eventId)) {
         return res.status(400).send({ message: "Invalid eventId" });
@@ -157,28 +173,33 @@ const UserController = () => {
 
       const platRes = await platformApi.createMeeting(platformId, platformData);
       const session = {
-        "id": platRes.data.id,
-        "type": "breakout",
-        "topic": platformData.topic,
-        "description": platformData.agenda,
-        "startAt": platformData.start_time,
-        "duration": platformData.duration,
-        "registrationOpen": !platformData.close_registration,
-        "platform": generalData.platform,
-        "inviteType": platformData.settings.approval_type == 0
-          ? "invite"
-          : platformData.settings.approval_type == 1
+        id: platRes.data.id,
+        type: "breakout",
+        topic: platformData.topic,
+        description: platformData.agenda,
+        startAt: platformData.start_time,
+        duration: platformData.duration,
+        registrationOpen: !platformData.close_registration,
+        platform: generalData.platform,
+        inviteType:
+          platformData.settings.approval_type == 0
+            ? "invite"
+            : platformData.settings.approval_type == 1
             ? "register"
             : "open",
-        "approvalNeeded": platformData.settings.approval_type == 1,
-        "maxCapacity": generalData.maxCapacity,
-        "status": "active",
-        "createdBy": req.user._id,
-        "eventId": Object(generalData.eventId)
+        approvalNeeded: platformData.settings.approval_type == 1,
+        maxCapacity: generalData.maxCapacity,
+        status: "active",
+        createdBy: req.user._id,
+        eventId: Object(generalData.eventId),
       };
 
-      const sessionRes = await SessionModel.create(session);
-      await createOrUpdateUserEvent(ObjectId(generalData.eventId), req.user._id, "organiser");
+      const sessionRes = await SessionModel.set(session);
+      await createOrUpdateUserEvent(
+        ObjectId(generalData.eventId),
+        req.user._id,
+        "organiser"
+      );
 
       platRes.data.id = sessionRes._id;
       res.status(platRes.status).send(platRes.data);
@@ -186,8 +207,7 @@ const UserController = () => {
       console.log(error);
       if (error.response)
         res.status(error.response.status).send(error.response.data);
-      else
-        res.status(500).send();
+      else res.status(500).send();
     }
   };
 
@@ -217,7 +237,7 @@ const UserController = () => {
 
   const getUsers = async (req, res) => {
     try {
-      let users = await UserModel.find({});
+      let users = await UserModel.getAll({});
       res.status(200).send(users);
     } catch (error) {
       console.log(error);
@@ -231,7 +251,7 @@ const UserController = () => {
     const userId = req.params.userId;
 
     try {
-      let users = await UserModel.findOne({ _id: userId });
+      let users = await UserModel.getOne({ _id: userId });
       res.status(200).send(users);
     } catch (error) {
       console.log(error);
@@ -242,7 +262,7 @@ const UserController = () => {
   };
 
   const updateUser = async (req, res) => {
-    let user = await UserModel.findOne({ _id: req.params.userId });
+    let user = await UserModel.getOne({ _id: req.params.userId });
     if (!user) {
       return res.status(400).json({ message: "User not found!" });
     }
@@ -272,11 +292,7 @@ const UserController = () => {
         data.dpurl = img.Location;
       }
 
-      user = await UserModel.findOneAndUpdate(
-        req.params.userId,
-        { $set: data },
-        { new: true }
-      );
+      user = await UserModel.UpdateOne({ _id: req.params.userId, data });
       res.status(200).send(user);
     } catch (error) {
       console.log(error);
@@ -290,7 +306,7 @@ const UserController = () => {
     const userId = req.params.userId;
 
     try {
-      let users = await UserModel.findOneAndDelete({ _id: userId });
+      let users = await UserModel.del({ _id: userId });
       res.status(200).send(users);
     } catch (error) {
       console.log(error);

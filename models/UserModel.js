@@ -3,7 +3,7 @@ var mongoose = require("mongoose");
 var UserSchema = new mongoose.Schema(
   {
     id: {
-      type: String
+      type: String,
     },
     first_name: {
       type: String,
@@ -105,9 +105,31 @@ var UserSchema = new mongoose.Schema(
       type: Date,
       default: Date.now,
     },
-    platformUser: { type: Boolean, default: false }
+    platformUser: { type: Boolean, default: false },
   },
   { timestamps: true }
 );
+const User = mongoose.model("users", UserSchema);
 
-module.exports = User = mongoose.model("users", UserSchema);
+// module.exports = User;
+
+module.exports.getAll = (option = {}) => {
+  return User.find(option);
+};
+
+module.exports.getOne = (option = {}) => {
+  return User.findOne(option);
+};
+module.exports.set = (data) => {
+  let user = new User(data);
+  return user.save();
+};
+module.exports.del = (op) => {
+  return User.deleteOne(op);
+};
+
+module.exports.UpdateOne = (query, updateData) => {
+  return User.findOneAndUpdate(query, { $set: updateData }, { new: true });
+};
+
+// module.exports = User;

@@ -1,6 +1,6 @@
 const SessionModel = require("../models/SessionModel");
 const UserSessionsModel = require("../models/UserSessions");
-const ObjectId = require('mongoose').Types.ObjectId;
+const ObjectId = require("mongoose").Types.ObjectId;
 
 const SessionController = () => {
   const createSession = async (req, res, next) => {
@@ -27,7 +27,7 @@ const SessionController = () => {
         data.imageURL = img.Location;
       }
 
-      let session = await SessionModel.create(data);
+      let session = await SessionModel.set(data);
       res.status(200).send(session);
     } catch (error) {
       console.log(error);
@@ -41,29 +41,12 @@ const SessionController = () => {
     try {
       const { type } = req.body;
       const predicate = {
-        createdBy: req.user._id
+        createdBy: req.user._id,
       };
-      if(type) {
+      if (type) {
         predicate.type = type;
       }
-      const sessions = await SessionModel.aggregate([{
-        $match: predicate
-      }, {
-        $lookup: {
-          from: 'usersessions',
-          localField: '_id',
-          foreignField: 'sessionId',
-          as: 'userSessions'
-        },
-      },
-      {
-        $lookup: {
-          from: 'users',
-          localField: 'userSessions.userId',
-          foreignField: '_id',
-          as: 'users'
-        }
-      }]);
+      const sessions = await SessionModel.getAll(predicate);
       res.send({ sessions });
     } catch (error) {
       console.log(error);
@@ -80,26 +63,8 @@ const SessionController = () => {
         return res.status(400).send();
       }
 
-      const session = await SessionModel.aggregate([
-        {
-          $match: { _id: ObjectId(id) }
-        }, {
-          $lookup: {
-            from: 'usersessions',
-            localField: '_id',
-            foreignField: 'sessionId',
-            as: 'userSessions'
-          },
-        },
-        {
-          $lookup: {
-            from: 'users',
-            localField: 'userSessions.userId',
-            foreignField: '_id',
-            as: 'users'
-          }
-        }])
-      if(!session.length) {
+      const session = await SessionModel.getOne({ _id: ObjectId(id) });
+      if (!session.length) {
         return res.status(404).send();
       }
       res.send({ session: session[0] });
@@ -112,7 +77,7 @@ const SessionController = () => {
   };
 
   const updateSession = async (req, res) => {
-    let session = await SessionModel.findOne({ _id: req.params.id });
+    let session = await SessionModel.getOne({ _id: req.params.id });
     if (!session) {
       return res.status(400).json({ message: "Session not found!" });
     }
@@ -139,11 +104,7 @@ const SessionController = () => {
         data.dpurl = img.Location;
       }
 
-      sesison = await SessionModel.findOneAndUpdate(
-        req.params.id,
-        { $set: data },
-        { new: true }
-      );
+      sesison = await SessionModel.UpdateOne({ _id: req.params.id }, data);
       res.status(200).send(session);
     } catch (error) {
       console.log(error);
@@ -157,7 +118,7 @@ const SessionController = () => {
     const id = req.params.id;
 
     try {
-      let sessions = await SessionModel.findOneAndDelete({ _id: id });
+      let sessions = await SessionModel.del({ _id: id });
       res.status(200).send(sessions);
     } catch (error) {
       console.log(error);
